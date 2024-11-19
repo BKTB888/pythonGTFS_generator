@@ -1,0 +1,140 @@
+import pandas as pd
+import shutil
+
+#Every modification takes place on these
+global routes, trips, stop_times, stops
+
+def addStop(stop_id ,stopName, x , y):
+    global stops
+    
+    next_row = pd.DataFrame({
+        'stop_id': [stop_id],
+        'stop_name': [stopName], 
+        'stop_lat': [   y     ],
+        'stop_lon': [   x     ]})
+    stops = pd.concat([stops, next_row], ignore_index=True)
+def addRoute (trip_id ,routeShortName, routeLongName, color):
+    global trips
+    global routes
+
+    route_id = 'R' + str(routes.index[-1] + 2)
+    next_row = pd.DataFrame({
+        'route_id': [route_id], 
+        'route_short_name': [routeShortName],
+        'route_long_name': [routeLongName],
+        'route_type': [1],
+        'route_color': [color]})
+    routes = pd.concat([routes, next_row], ignore_index=True)
+    trips  = pd.concat([trips, pd.DataFrame({
+        'route_id': [route_id],
+        'service_id': [1],
+        'trip_id': [trip_id]
+    })], ignore_index=True)
+
+#Adds stop to the end of line
+def addStopToLine(stop_id, trip_id):
+    global stop_times
+    global trips
+    global routes
+    global stops
+
+    if (not trips['trip_id'].isin([trip_id]).any or not stops['stop_id'].isin([stop_id]).any):
+        return
+    
+    trip_length = stop_times[stop_times['trip_id'] == trip_id].shape[0]
+    next_row = pd.DataFrame({
+        'trip_id': [trip_id],
+        'arrival_time': ['08:00:00'],
+        'departure_time': ['08:00:00'],
+        'stop_id': [stop_id],
+        'stop_sequence': [trip_length + 1]
+    })
+
+    stop_times = pd.concat([stop_times, next_row], ignore_index=True)
+def deleteStopFromStops(stop_id):
+    global stops
+    global stop_times
+
+    stop_id_col = stops['stop_id']
+
+    if (not stop_id_col.isin([stop_id]).any()):
+        return
+    
+    stops = stops[stop_id_col != stop_id]
+def deleteStopFromLine(stop_id, trip_id):
+    global stop_times
+    global trips
+
+    if ( not trips['trip_id'].isin([trip_id]).any()):
+        return
+    stop_ids = stop_times['stop_id']
+    trip_ids = stop_times["trip_id"]
+
+    criteria = (stop_ids == stop_id) & (trip_ids == trip_id)
+
+    stop_sequence = stop_times.loc[criteria, 'stop_sequence'].iloc[0]
+    stop_times.drop(stop_times [criteria].index, inplace=True)
+    stop_times.loc[(stop_times['trip_id'] == trip_id) & (stop_times['stop_sequence'] > stop_sequence), 'stop_sequence'] -= 1
+def renameRoute(route_id, route_short_name, route_long_name):
+    global routes
+    routes.loc[routes['route_id'] == route_id, ['route_short_name', 'route_long_name']] = [route_short_name, route_long_name]
+def loadGTFS(pathFrom):
+    global routes, trips, stop_times, stops
+    shutil.unpack_archive(pathFrom, 'src')
+    # Load GTFS files
+    routes = pd.read_csv("src/routes.txt")
+    trips = pd.read_csv("src/trips.txt")
+    stop_times = pd.read_csv("src/stop_times.txt")
+    stops = pd.read_csv("src/stops.txt")
+def saveGTFS(name):
+    # Save Changes
+    routes.to_csv("result/routes.txt", sep=',', index=False)
+    stop_times.to_csv("result/stop_times.txt", sep=',', index=False)
+    stops.to_csv("result/stops.txt", sep=',', index=False)
+    trips.to_csv("result/trips.txt", sep=',', index=False)
+    shutil.copy('src/agency.txt', 'result')
+
+    shutil.make_archive(name, 'zip', "result")
+
+
+#Example
+loadGTFS('arrange.zip')
+print("\n\nSOURCE:")
+print("\nStops:")
+print(stops)
+print("\nStop times:")
+print(stop_times)
+print("\nTrips:")
+print(trips)
+print("\nRoutes:")
+print(routes)
+
+
+
+
+#This is just to correct some coordinates to have them as I would like
+stops.loc[stops.index[-1], 'stop_lat'] = 0
+stops.loc[stops.index[-2], 'stop_lat'] = 0
+stops.loc[stops.index[-2], 'stop_lon'] = 0
+stops.loc[stops.index[-1], 'stop_lon'] = 1
+
+
+
+addStop('C','Station C', 0, -1)
+addRoute('L2' ,'L2', 'Line 2', 'FF8C33')
+
+#Adds Station A and station C to L2 line
+addStopToLine(1, 'L2')
+addStopToLine('C', 'L2')
+
+saveGTFS('result')
+
+print("\n\nRESULT:")
+print("\nStops:")
+print(stops)
+print("\nStop times:")
+print(stop_times)
+print("\nTrips:")
+print(trips)
+print("\nroutes:")
+print(routes)

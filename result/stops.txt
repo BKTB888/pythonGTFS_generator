@@ -1,0 +1,4 @@
+stop_id,stop_name,stop_lat,stop_lon
+1,Station A,0.0,0.0
+2,Station B,0.0,1.0
+C,Station C,-1.0,0.0
